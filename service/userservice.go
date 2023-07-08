@@ -2,7 +2,7 @@
  * @Descripttion: User Model
  * @Author: DW
  * @Date: 2023-05-05 08:15:15
- * @LastEditTime: 2023-07-04 21:16:01
+ * @LastEditTime: 2023-07-08 11:06:31
  */
 package service
 
@@ -130,6 +130,14 @@ func FindUserByNameAndPwd(c *gin.Context) {
 	})
 }
 
+func FindByID(c *gin.Context) {
+	userId, _ := strconv.Atoi(c.Request.FormValue("userId"))
+
+	data := models.FindByID(uint(userId))
+
+	utils.RespOK(c.Writer, data, "ok")
+}
+
 // DeleteUser
 // @Tags 用户模块
 // @Param id query string false "用户id"
@@ -163,6 +171,7 @@ func UpdateUser(c *gin.Context) {
 	user.Name = c.PostForm("name")
 	user.Password = c.PostForm("password")
 	user.Phone = c.PostForm("phone")
+	user.Avatar = c.PostForm("icon")
 	user.Email = c.PostForm("email")
 	fmt.Println("update", user)
 	_, err := govalidator.ValidateStruct(user)
@@ -236,8 +245,9 @@ func SearchFriends(c *gin.Context) {
 
 func AddFriend(c *gin.Context) {
 	userId, _ := strconv.Atoi(c.Request.FormValue("userId"))
-	targetId, _ := strconv.Atoi(c.Request.FormValue("targetId"))
-	code, msg := models.AddFriend(uint(userId), uint(targetId))
+	targetName := c.Request.FormValue("targetName")
+	//targetId, _ := strconv.Atoi(c.Request.FormValue("targetId"))
+	code, msg := models.AddFriend(uint(userId), targetName)
 	if code == 0 {
 		utils.RespOK(c.Writer, code, msg)
 	} else {
@@ -249,9 +259,13 @@ func AddFriend(c *gin.Context) {
 func CreateCommunity(c *gin.Context) {
 	ownerId, _ := strconv.Atoi(c.Request.FormValue("ownerId"))
 	Name := c.Request.FormValue("name")
+	icon := c.Request.FormValue("icon")
+	desc := c.Request.FormValue("desc")
 	community := models.Community{}
 	community.OwnerId = uint(ownerId)
 	community.Name = Name
+	community.Img = icon
+	community.Desc = desc
 	code, msg := models.CreateCommunity(community)
 	if code == 0 {
 		utils.RespOK(c.Writer, code, msg)
@@ -285,4 +299,14 @@ func JoinGroups(c *gin.Context) {
 	} else {
 		utils.RespFail(c.Writer, msg)
 	}
+}
+
+func RedisMsg(c *gin.Context) {
+	userIdA, _ := strconv.Atoi(c.PostForm("userIdA"))
+	userIdB, _ := strconv.Atoi(c.PostForm("userIdB"))
+	start, _ := strconv.Atoi(c.PostForm("start"))
+	end, _ := strconv.Atoi(c.PostForm("end"))
+	isRev, _ := strconv.ParseBool(c.PostForm("isRev"))
+	res := models.ReadRedisMsg(int64(userIdA), int64(userIdB), int64(start), int64(end), isRev)
+	utils.RespOkList(c.Writer, "ok", res)
 }

@@ -2,18 +2,21 @@
  * @Descripttion:
  * @Author:
  * @Date: 2023-05-08 08:06:37
- * @LastEditTime: 2023-07-04 21:24:16
+ * @LastEditTime: 2023-07-08 11:10:02
  */
 package models
 
 import (
 	"chatapp/utils"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"strconv"
 	"sync"
+
+	"github.com/go-redis/redis/v8"
 
 	"github.com/gorilla/websocket"
 	"gopkg.in/fatih/set.v0"
@@ -38,9 +41,13 @@ func (table *Message) TableName() string {
 }
 
 type Node struct {
-	Conn      *websocket.Conn
-	DataQueue chan []byte
-	GroupSets set.Interface
+	Conn          *websocket.Conn
+	Addr          string        //客户端地址
+	FirstTime     uint64        //首次连接时间
+	HeartbeatTime uint64        //心跳时间
+	LoginTime     uint64        //登录时间
+	DataQueue     chan []byte   //消息
+	GroupSets     set.Interface //好友/群
 }
 
 //映射关系
@@ -49,6 +56,7 @@ var clientMap map[int64]*Node = make(map[int64]*Node, 0)
 //读写锁
 var rwLocker sync.RWMutex
 
+// 发送者ID 接收者ID 消息类型 发送内容 发送类型
 func Chat(writer http.ResponseWriter, request *http.Request) {
 	//校验token
 	//token := query.Get("token")
@@ -73,7 +81,8 @@ func Chat(writer http.ResponseWriter, request *http.Request) {
 
 	// 获取Conn
 	node := &Node{
-		Conn:      conn,
+		Conn: conn,
+
 		DataQueue: make(chan []byte, 50),
 		GroupSets: set.New(set.ThreadSafe),
 	}
@@ -197,7 +206,39 @@ func sendMsg(userId int64, msg []byte) {
 	rwLocker.RLock()
 	node, ok := clientMap[userId]
 	rwLocker.RUnlock()
+	jsonMsg := Message{}
+	json.Unmarshal(msg, &jsonMsg)
+	ctx := context.Background()
+	targetIdStr := strconv.Itoa(int(userId))
+	userIdStr := strconv.Itoa(int(jsonMsg.ID))
+
+	r, err := utils.Red.Get(ctx, "online_"+userIdStr).Result()
+	if err != nil {
+		fmt.Println(err)
+	}
+	if r != "" {
+		if ok {
+			fmt.Println("sendMsg >>> userId :", userId, "msg :", string(msg))
+		}
+	}
+	var key string
+	if userId > jsonMsg.FormId {
+		key = "msg_" + userIdStr + "_" + targetIdStr
+	} else {
+		key = "msg_" + targetIdStr + "_" + userIdStr
+	}
+	res, err := utils.Red.ZRevRange(ctx, key, 0, -1).Result()
+	if err != nil {
+		fmt.Println(err)
+	}
+	score := float64(cap(res)) + 1
+	ress, e := utils.Red.ZAdd(ctx, key, &redis.Z{score, msg}).Result()
+	if e != nil {
+		fmt.Println(e)
+	}
+
 	if ok {
+		fmt.Println(ress)
 		node.DataQueue <- msg
 	}
 }
@@ -222,4 +263,42 @@ func JoinGroup(userId uint, comId string) (int, string) {
 		utils.DB.Create(&contact)
 		return 0, "加群成功"
 	}
+}
+
+func (msg Message) MarshalBinary() ([]byte, error) {
+	return json.Marshal(msg)
+}
+
+//获取缓存里的消息
+
+func ReadRedisMsg(userIdA int64, userIdB int64, start, end int64, isRev bool) []string {
+	rwLocker.RLock()
+	//_, _ := clientMap[userIdA]
+	rwLocker.RUnlock()
+
+	ctx := context.Background()
+	userIdStr := strconv.Itoa(int(userIdA))
+	targetIdStr := strconv.Itoa(int(userIdB))
+	var key string
+	if userIdA > userIdB {
+		key = "msg_" + targetIdStr + "_" + userIdStr
+	} else {
+		key = "msg_" + userIdStr + "_" + targetIdStr
+	}
+	var rels []string
+	var err error
+	if isRev {
+		rels, err = utils.Red.ZRange(ctx, key, 0, 10).Result()
+
+	} else {
+		rels, err = utils.Red.ZRevRange(ctx, key, 0, 10).Result()
+
+	}
+	//rels, err := utils.Red.ZRange(ctx, key, 0, 10).Result()
+	//rels, err := utils.Red.ZRange(ctx, key, 0, 10).Result()
+	if err != nil {
+		fmt.Println(err)
+	}
+	// 发送推送消息
+	return rels
 }

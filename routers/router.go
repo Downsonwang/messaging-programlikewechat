@@ -2,7 +2,7 @@
  * @Descripttion:
  * @Author:
  * @Date: 2023-05-04 08:16:11
- * @LastEditTime: 2023-07-04 21:13:13
+ * @LastEditTime: 2023-07-08 10:42:55
  */
 package routers
 
@@ -38,16 +38,22 @@ func Router() *gin.Engine {
 	r.GET("/user/deleteUser", service.DeleteUser)
 	r.POST("/user/updateUser", service.UpdateUser)
 	r.POST("/user/findUserByNameAndPwd", service.FindUserByNameAndPwd)
+	r.POST("/user/find", service.FindByID)
 
+	//添加好友
+	r.POST("/contact/addfriend", service.AddFriend)
 	//发送消息
 	r.GET("/user/sendMsg", service.SendMsg)
+	//发送消息
 	r.GET("/user/sendUserMsg", service.SendUserMsg)
+	//上传文件
 	r.POST("/attach/upload", service.Upload)
+	//创建群
 	r.POST("/contact/createCommunity", service.CreateCommunity)
+	//群列表
 	r.POST("/contact/loadCommunity", service.LoadCommunity)
-
+	//加入群
 	r.POST("/contact/joinGroup", service.JoinGroups)
-	//创建群聊
-	r.POST("", service.AddFriend)
+
 	return r
 }

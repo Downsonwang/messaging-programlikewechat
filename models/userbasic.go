@@ -2,7 +2,7 @@
  * @Descripttion:
  * @Author:
  * @Date: 2023-05-03 09:26:17
- * @LastEditTime: 2023-06-04 10:34:00
+ * @LastEditTime: 2023-07-06 18:10:51
  */
 package models
 
@@ -20,6 +20,7 @@ type UserBasic struct {
 	Password      string
 	Phone         string `valid:"matches(^1[3-9]{1}\\d{9}$)"`
 	Email         string `valid:"email"`
+	Avatar        string
 	Identity      string
 	ClientIP      string
 	ClientPort    string
@@ -63,6 +64,7 @@ func UpdateUser(user UserBasic) *gorm.DB {
 		Password: user.Password,
 		Phone:    user.Phone,
 		Email:    user.Email,
+		Avatar:   user.Avatar,
 	})
 }
 

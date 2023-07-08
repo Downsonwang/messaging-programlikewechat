@@ -2,7 +2,7 @@
  * @Descripttion:
  * @Author: IM
  * @Date: 2023-05-08 08:18:03
- * @LastEditTime: 2023-06-04 15:03:49
+ * @LastEditTime: 2023-07-08 10:47:21
  */
 package models
 
@@ -40,17 +40,17 @@ func SearchFriend(userId uint) []UserBasic {
 }
 
 // 添加好友
-func AddFriend(userId uint, targetId uint) (int, string) {
-	user := UserBasic{}
-	if targetId != 0 {
-		user = FindByID(targetId)
-		fmt.Println(targetId, "       ", userId)
-		if user.Salt != "" {
-			if userId == user.ID {
+func AddFriend(userId uint, targetName string) (int, string) {
+	//user := UserBasic{}
+	if targetName != "" {
+		targetUser := FindUserByName(targetName)
+		//fmt.Println(targetId, "       ", userId)
+		if targetUser.Salt != "" {
+			if userId == targetUser.ID {
 				return -1, "不能添加自己"
 			}
 			contact0 := Contact{}
-			utils.DB.Where("owner_id = ? and target_id = ? and type = 1", userId, targetId).Find(&contact0)
+			utils.DB.Where("owner_id = ? and target_id = ? and type = 1", userId, targetUser.ID).Find(&contact0)
 			if contact0.ID != 0 {
 				return -1, "不能重复添加"
 			}
@@ -63,14 +63,14 @@ func AddFriend(userId uint, targetId uint) (int, string) {
 			}()
 			contact := Contact{}
 			contact.OwnerId = userId
-			contact.TargetId = targetId
+			contact.TargetId = targetUser.ID
 			contact.Type = 1
 			if err := utils.DB.Create(&contact).Error; err != nil {
 				tx.Rollback()
 				return -1, "添加好友失败"
 			}
 			contactFir := Contact{}
-			contactFir.OwnerId = targetId
+			contactFir.OwnerId = targetUser.ID
 			contactFir.TargetId = userId
 			contact.Type = 1
 			if err := utils.DB.Create(&contactFir).Error; err != nil {
